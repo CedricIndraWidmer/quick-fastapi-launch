@@ -4,4 +4,4 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return "EC2 system check"
+    return "Github Actions system check successful!"
