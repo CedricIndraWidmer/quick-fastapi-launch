@@ -4,4 +4,4 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return "Github Actions system check successful!"
+    return "Github Actions system check successful 2!"
