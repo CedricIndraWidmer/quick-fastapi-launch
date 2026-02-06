@@ -1,0 +1,38 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]  # or your preferred branch
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::772064137293:role/GitHub-CedricIndraWidmer
+        role-session-name: GitHubActions
+        aws-region: eu-central-2
+    
+    - name: Upload to S3
+      run: |
+        aws s3 sync . s3://772064137293-deployment-bucket --exclude ".git/*" --exclude ".github/*"
+    
+    - name: Deploy with CodeDeploy
+      run: |
+        aws deploy create-deployment \
+          --application-name finbitticelli-test-app \
+          --deployment-group-name finbotticelli-test-app-deployment-group \
+          --s3-location bucket=772064137293-deployment-bucket,key=your-app.zip,bundleType=zip
