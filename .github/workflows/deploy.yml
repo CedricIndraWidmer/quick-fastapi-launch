@@ -31,8 +31,28 @@ jobs:
         aws s3 sync . s3://772064137293-deployment-bucket --exclude ".git/*" --exclude ".github/*"
     
     - name: Deploy with CodeDeploy
+      id: deploy
       run: |
-        aws deploy create-deployment \
-          --application-name finbitticelli-test-app \
-          --deployment-group-name finbotticelli-test-app-deployment-group \
-          --s3-location bucket=772064137293-deployment-bucket,key=your-app.zip,bundleType=zip
+        DEPLOYMENT_ID=$(aws deploy create-deployment \
+          --application-name finbotticelli \
+          --deployment-group-name test-deployment \
+          --deployment-config-name CodeDeployDefault.AllAtOneTime \
+          --description "Automated deployment from GitHub Actions - Commit: ${{ github.sha }}" \
+          --s3-location bucket=772064137293-deployment-bucket,key=your-app.zip,bundleType=zip \
+          --file-exists-behavior OVERWRITE \
+          --output text --query 'deploymentId')
+        
+        echo "Deployment ID: $DEPLOYMENT_ID"
+        echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+        
+        # Wait for deployment to complete
+        aws deploy wait deployment-successful --deployment-id $DEPLOYMENT_ID
+        
+        echo "Deployment completed successfully!"
+
+    - name: Get deployment status on failure
+      if: failure()
+      run: |
+        if [ ! -z "${{ steps.deploy.outputs.deployment-id }}" ]; then
+          aws deploy get-deployment --deployment-id ${{ steps.deploy.outputs.deployment-id }}
+        fi
