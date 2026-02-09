@@ -40,5 +40,5 @@ jobs:
             pip install -r requirements.txt
 
             # Start/Restart the app with PM2 using uvicorn
-            pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "fastapi-app" || pm2 restart "fastapi-app"
+            pm2 start ecosystem.config.js || pm2 reload ecosystem.config.js
             pm2 save

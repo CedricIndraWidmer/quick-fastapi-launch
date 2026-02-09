@@ -1,0 +1,14 @@
+module.exports = {
+    apps: [{
+        name: "fastapi-app",
+        script: "uvicorn",
+        args: "main:app --host 0.0.0.0 --port 8000",
+        interpreter: "python3", // or just "python" depending on your system
+        autorestart: true,
+        watch: true, // Set to true for dev, false for prod deployments
+        max_memory_restart: '1G',
+        env: {
+            NODE_ENV: "production",
+        },
+    }]
+};
