@@ -1,6 +1,4 @@
-# Deploy Workflow
-
-name: Deploy to Production
+name: Deploy to EC2 via SSH
 
 on:
   push:
@@ -12,21 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out the code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - name: Deploy code to EC2 via SCP
+        uses: appleboy/scp-action@v1.0.0
         with:
-          python-version: '3.8'
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          source: "."
+          target: ${{ secrets.TARGET_DIR }}
+          rm: false
 
-      - name: Install dependencies
-        run: |
-          python -m venv venv
-          . venv/bin/activate
-          pip install -r requirements.txt
+      - name: Run deployment commands on EC2
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.TARGET_DIR }}
+            git pull origin main
 
-      - name: Deploy application
-        run: |
-          . venv/bin/activate
-          pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "fastapi-app" || pm2 restart "fastapi-app"
+            # Set up/Update Virtual Environment
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+
+            # Start/Restart the app with PM2 using uvicorn
+            pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "fastapi-app" || pm2 restart "fastapi-app"
+            pm2 save
