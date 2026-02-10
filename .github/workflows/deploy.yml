@@ -13,13 +13,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy code to EC2 via SCP
+      - name: Create deployment package
+        run: |
+          mkdir -p deployment
+          # Exclude unnecessary files from the package
+          zip -r deployment/app.zip . \
+            -x "node_modules/*" \
+            ".git/*" \
+            ".github/*" \
+            "venv/*" \
+            ".env*" \
+            "*.log" \
+            ".DS_Store"
+
+      - name: Deploy package to EC2 via SCP
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "."
+          source: "deployment/app.zip"
           target: ${{ secrets.TARGET_DIR }}
           rm: false
 
@@ -32,7 +45,10 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.TARGET_DIR }}
-            git pull origin main
+            
+            # Extract deployment package
+            unzip -o deployment/app.zip -d .
+            rm deployment/app.zip
 
             # Set up/Update Virtual Environment
             python3 -m venv venv
