@@ -1,13 +1,16 @@
-name: Deploy to EC2 via SSH
+name: Multi-Env Deploy (Staging & Prod)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch: # Manual trigger for Production
 
 jobs:
   deploy:
+    name: Deploy to ${{ github.event_name == 'push' && 'Staging' || 'Production' }}
     runs-on: ubuntu-latest
+    # Selects environment based on the trigger
+    environment: ${{ github.event_name == 'push' && 'staging' || 'production' }}
 
     steps:
       - name: Checkout repository
@@ -16,45 +19,51 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p deployment
-          # Exclude unnecessary files from the package
           zip -r deployment/app.zip . \
-            -x "node_modules/*" \
-            ".git/*" \
-            ".github/*" \
-            "venv/*" \
-            ".env*" \
-            "*.log" \
-            ".DS_Store"
+            -x "node_modules/*" ".git/*" ".github/*" "venv/*" ".env*" "*.log" ".DS_Store" "deployment/*"
 
-      - name: Deploy package to EC2 via SCP
+      - name: Copy package to EC2
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "deployment/app.zip"
-          target: ${{ secrets.TARGET_DIR }}
+          source: "deployment/app.zip,nginx/fastapi.conf"
+          target: ${{ vars.TARGET_DIR }}
           rm: false
 
-      - name: Run deployment commands on EC2
+      - name: Execute Remote Deployment & Nginx Update
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          # Pass the environment name to the script to determine PM2 flag
+          envs: GITHUB_ENV_NAME
           script: |
             set -e
-            cd ${{ secrets.TARGET_DIR }}
-            
-            # Extract deployment package
+            cd ${{ vars.TARGET_DIR }}
+
+            # 1. Extract Package
             unzip -o deployment/app.zip -d .
             rm deployment/app.zip
 
-            # Set up/Update Virtual Environment
+            # 2. Update Python Environment
             python3 -m venv venv
             source venv/bin/activate
             pip install -r requirements.txt
 
-            # Start/Restart the app with PM2 using uvicorn
-            pm2 start ecosystem.config.js || pm2 reload ecosystem.config.js
+            # 3. Update Nginx (Uses sudo - ensure your user has sudo privileges)
+            # We copy the config from the repo to Nginx system folders
+            sudo cp nginx/fastapi.conf /etc/nginx/sites-available/fastapi-multi
+            sudo ln -sf /etc/nginx/sites-available/fastapi-multi /etc/nginx/sites-enabled/
+            sudo nginx -t && sudo systemctl reload nginx
+
+            # 4. Restart PM2 based on environment
+            # If triggered by push, use 'staging'. If manual, use 'production'.
+            if [ "${{ github.event_name }}" = "push" ]; then
+              pm2 start ecosystem.config.js --env staging || pm2 reload ecosystem.config.js --env staging
+            else
+              pm2 start ecosystem.config.js --env production || pm2 reload ecosystem.config.js --env production
+            fi
             pm2 save

@@ -1,6 +1,8 @@
+import os
 from fastapi import FastAPI
 
-app = FastAPI()
+app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))
+
 
 @app.get("/")
 def read_root():
