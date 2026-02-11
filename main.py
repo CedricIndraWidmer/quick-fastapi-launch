@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))
 
-version = "1.2.0"
+version = "1.3.0"
 now = datetime.now()
 formatted_date = now.strftime("%Y.%m.%d")
 message = f"Github Actions system check successful. Running dual environments on {formatted_date} - v.{version}!"
