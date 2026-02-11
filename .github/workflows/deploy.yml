@@ -71,8 +71,10 @@ jobs:
             # 4. Restart PM2
             echo "Deploying to environment: $GITHUB_ENV_NAME"
             if [ "$GITHUB_ENV_NAME" = "staging" ]; then
-                pm2 start ecosystem.config.js --only fastapi-app-staging || pm2 reload fastapi-app-staging
+                pm2 delete fastapi-app-staging 2>/dev/null || true
+                pm2 start ecosystem.config.js --only fastapi-app-staging
             else
-                pm2 start ecosystem.config.js --only fastapi-app-prod || pm2 reload fastapi-app-prod
+                pm2 delete fastapi-app-prod 2>/dev/null || true
+                pm2 start ecosystem.config.js --only fastapi-app-prod
             fi
             pm2 save
