@@ -1,5 +1,5 @@
 import os
-import datetime
+from datetime import datetime
 from fastapi import FastAPI
 
 app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))
