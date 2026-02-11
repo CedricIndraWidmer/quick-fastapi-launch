@@ -28,7 +28,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          source: "deployment/app.zip,nginx/fastapi.conf"
+          source: "deployment/app.zip"
           target: ${{ vars.TARGET_DIR }}
           rm: false
 
@@ -43,21 +43,27 @@ jobs:
           script: |
             set -e
             cd ${{ vars.TARGET_DIR }}
+            ls -R # List files for debugging
 
             # 1. Extract Package
             unzip -o deployment/app.zip -d .
             rm deployment/app.zip
 
-            # 2. Update Python Environment
+            # 2. Update Nginx
+            # Check if the file exists before copying to avoid the 'cannot stat' error
+            if [ -f "./nginx/fastapi.conf" ]; then
+                sudo cp nginx/fastapi.conf /etc/nginx/sites-available/fastapi-multi
+                sudo ln -sf /etc/nginx/sites-available/fastapi-multi /etc/nginx/sites-enabled/
+                sudo nginx -t && sudo systemctl reload nginx
+            else
+                echo "Error: nginx/fastapi.conf not found in $(pwd)"
+                exit 1
+            fi
+
+            # 3. Update Python Environment
             python3 -m venv venv
             source venv/bin/activate
             pip install -r requirements.txt
-
-            # 3. Update Nginx (Uses sudo - ensure your user has sudo privileges)
-            # We copy the config from the repo to Nginx system folders
-            sudo cp nginx/fastapi.conf /etc/nginx/sites-available/fastapi-multi
-            sudo ln -sf /etc/nginx/sites-available/fastapi-multi /etc/nginx/sites-enabled/
-            sudo nginx -t && sudo systemctl reload nginx
 
             # 4. Restart PM2 based on environment
             # If triggered by push, use 'staging'. If manual, use 'production'.
