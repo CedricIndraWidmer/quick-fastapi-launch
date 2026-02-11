@@ -62,6 +62,7 @@ jobs:
             fi
 
             # 3. Update Python Environment
+            echo "Updating Python Environment for $GITHUB_ENV_NAME..."
             python3 -m venv venv
             source venv/bin/activate
             pip install --upgrade pip
@@ -69,5 +70,9 @@ jobs:
 
             # 4. Restart PM2
             echo "Deploying to environment: $GITHUB_ENV_NAME"
-            pm2 start ecosystem.config.js --env $GITHUB_ENV_NAME || pm2 reload ecosystem.config.js --env $GITHUB_ENV_NAME
+            if [ "$GITHUB_ENV_NAME" = "staging" ]; then
+                pm2 start ecosystem.config.js --only fastapi-app-staging || pm2 reload fastapi-app-staging
+            else
+                pm2 start ecosystem.config.js --only fastapi-app-prod || pm2 reload fastapi-app-prod
+            fi
             pm2 save
